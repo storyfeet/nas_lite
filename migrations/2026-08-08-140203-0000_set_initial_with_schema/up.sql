@@ -1,0 +1,29 @@
+-- Your SQL goes here
+CREATE TABLE `users`(
+	`id` INTEGER NOT NULL PRIMARY KEY,
+	`user_name` TEXT,
+	`password_hash` BINARY,
+	`created` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	`modified` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE `sessions`(
+	`token` TEXT NOT NULL,
+	`token_pass` TEXT NOT NULL,
+	`user_id` INTEGER NOT NULL,
+	`created` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	`expires` TIMESTAMP NOT NULL
+);
+
+CREATE TABLE `files`(
+	`id` INTEGER NOT NULL PRIMARY KEY,
+	`user_id` INTEGER NOT NULL,
+	`file_name` TEXT,
+	`parent` INTEGER,
+	`content` BINARY,
+	`file_hash` TEXT,
+	`created` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	`modified` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	`deleted` TIMESTAMP
+);
+

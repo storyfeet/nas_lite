@@ -1,0 +1,10 @@
+CREATE TABLE files (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    owner INTEGER,
+    name TEXT,
+    parent INTEGER,
+    content BLOB,
+    hash TEXT,
+    created DATETIME DEFAULT CURRENT_TIMESTAMP
+    deleted DATETIME,
+);
