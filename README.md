@@ -60,5 +60,51 @@ Token:
     User?
     Expiry
 
+API
+----
+
+get_hash (owner,path,token)
+get_file (path)
+get_dir (path)
+put_file (path,path,token,data)
+delete_file (path)
+
+
+
+
+Frontend
+-------
+
+files :
+Settings json
+{
+    server:
+    tokens:{key,pass}
+    folders:[
+        {
+            path:...
+            owner...
+            server_path
+        }
+    ]
+}
+
+tracking.json
+[
+    folder:{
+        path:
+        hash:md5
+        updated:date
+        data:bytes
+        deleted:bool
+    }
+]
+    folders:[
+        {
+            
+        }
+    ]
+}
+
     
     
