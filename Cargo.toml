@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 anyhow = "1.0.104"
 bcrypt = "0.19.3"
+chrono = "0.4.45"
 diesel = {version = "2.3.12" , features = ["sqlite","chrono"]}
 dotenvy = "0.15.7"
 err_tools = "0.2.3"

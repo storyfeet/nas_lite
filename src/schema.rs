@@ -15,8 +15,8 @@ diesel::table! {
 }
 
 diesel::table! {
-    sessions (rowid) {
-        rowid -> Integer,
+    sessions (id) {
+        id -> Integer,
         token -> Text,
         token_pass -> Text,
         user_id -> Integer,
@@ -28,10 +28,10 @@ diesel::table! {
 diesel::table! {
     users (id) {
         id -> Integer,
-        user_name -> Nullable<Text>,
-        password_hash -> Nullable<Binary>,
         created -> Timestamp,
         modified -> Timestamp,
+        user_name -> Text,
+        password_hash -> Text,
     }
 }
 
