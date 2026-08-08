@@ -24,29 +24,21 @@ Folders also maintain a hash, if a child hash changes the parent will also need 
 Tables
 --------
 
-Folder:
+Folder / File:
     Name
     Parent
     Path
     Hash 
     Owner
     size
-
-File:
-    Name
-    Path
-    Folder
     Data
-    Hash - calculated from direct children
-    Owner
-    size - calculated from direct children
-    expired? - 
 
 User:
     Name
 
 
-Share:
+
+Share: // Later
     Folder:
     Owner:
     Accessor?:
@@ -54,7 +46,7 @@ Share:
     Permission:
 
 
-Token:
+Token: // Later
     Id
     Key
     User?
