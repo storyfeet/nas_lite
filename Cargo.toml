@@ -4,5 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+anyhow = "1.0.104"
+bcrypt = "0.19.3"
 diesel = {version = "2.3.12" , features = ["sqlite","chrono"]}
+dotenvy = "0.15.7"
+err_tools = "0.2.3"
 rocket = "0.5.1"
+structopt = "0.3.26"
