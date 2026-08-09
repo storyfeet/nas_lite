@@ -1,5 +1,6 @@
 mod models;
 mod schema;
+mod server;
 
 use structopt::StructOpt;
 use err_tools::{*,traceable::*};
@@ -34,7 +35,7 @@ fn main() ->Result<(),TraceError> {
         Opt::CheckPassword(u) =>{
             _ = check_password(u)?;
         }
-        Opt::Serve => {println!("Serving")}
+        Opt::Serve => {return self::server::run_server()}
     }
     Result::<(),TraceError>::Ok(())
 

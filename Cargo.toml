@@ -5,10 +5,11 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1.0.104"
+axum = "0.8.9"
 bcrypt = "0.19.3"
 chrono = "0.4.45"
 diesel = {version = "2.3.12" , features = ["sqlite","chrono"]}
 dotenvy = "0.15.7"
 err_tools = "0.2.3"
-rocket = "0.5.1"
 structopt = "0.3.26"
+tokio = { version = "1.53.1", features = ["full"] }
