@@ -1,7 +1,12 @@
 use anyhow::*;
-use axum::{Router, extract::Path, routing::get};
-use diesel::sqlite::SqliteConnection;
+use axum::{
+    Router,
+    extract::{Path, State},
+    routing::get,
+};
+use diesel::{prelude::*, sqlite::SqliteConnection};
 use diesel_async::{
+    AsyncConnection, RunQueryDsl,
     pooled_connection::{AsyncDieselConnectionManager, bb8::Pool},
     sync_connection_wrapper::SyncConnectionWrapper,
 };
@@ -12,8 +17,39 @@ async fn hello() -> &'static str {
     "hello fools"
 }
 
-async fn check_pass(Path((name, pass)): Path<(String, String)>) -> String {
-    return format!("Hello to {} - {}", name, pass);
+async fn check_pass(
+    Path((name, pass)): Path<(String, String)>,
+    State(cpool): State<CPool>,
+) -> String {
+    //Result<String, TraceError> {
+    use crate::models::User;
+    use crate::schema::users::dsl::*;
+
+    let mut con = cpool.get().await.unwrap();
+    //.map_err(any_wrap!("Could not access connection pool"))?;
+
+    let user_list = users
+        .filter(user_name.eq(&name))
+        .limit(5)
+        .select(User::as_select())
+        .load(&mut con)
+        .await
+        .unwrap(); //.map_err(any_wrap!("Could not run load user by name {}", &name))?;
+
+    let mut found = false;
+    for user in user_list {
+        if bcrypt::verify(&pass, &user.password_hash).unwrap()
+        //.map_err(any_wrap!("BCrypt couldn't verify password"))?
+        {
+            found = true;
+        }
+    }
+
+    if found {
+        return format!("Password found for {}", &name);
+    }
+    return format!("Password not found for {} ", &name);
+    //return Result::<String, TraceError>::Ok(format!("Hello to {} - {}", name, pass));
 }
 
 type CManager = SyncConnectionWrapper<SqliteConnection>;
