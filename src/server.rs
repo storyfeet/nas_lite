@@ -1,5 +1,5 @@
 use anyhow::*;
-use axum::{Router, routing::get};
+use axum::{Router, extract::Path, routing::get};
 use diesel::sqlite::SqliteConnection;
 use diesel_async::{
     pooled_connection::{AsyncDieselConnectionManager, bb8::Pool},
@@ -12,7 +12,12 @@ async fn hello() -> &'static str {
     "hello fools"
 }
 
+async fn check_pass(Path((name, pass)): Path<(String, String)>) -> String {
+    return format!("Hello to {} - {}", name, pass);
+}
+
 type CManager = SyncConnectionWrapper<SqliteConnection>;
+type CPool = Pool<CManager>;
 
 pub fn run_server() -> Result<(), TraceError> {
     println!("Running Server");
@@ -26,12 +31,15 @@ pub fn run_server() -> Result<(), TraceError> {
         //let connection = SyncConnectionWrapper::<SqliteConnection>::establish(&db_url).await.expect("Could not establish connection");
 
         let manager = AsyncDieselConnectionManager::<CManager>::new(&db_url);
-        let pool: Pool<CManager> = Pool::builder()
+        let pool: CPool = Pool::builder()
             .build(manager)
             .await
             .expect("Could not build connection pool");
 
-        let app = Router::new().route("/", get(hello)).with_state(pool);
+        let app = Router::new()
+            .route("/", get(hello))
+            .route("/check/{name}/{pass}", get(check_pass))
+            .with_state(pool);
 
         // run our app with hyper, listening globally on port 3000
         let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
