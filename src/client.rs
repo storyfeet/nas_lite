@@ -25,7 +25,14 @@ pub fn run_client(client_args: ClientArgs) -> Result<(), TraceError> {
             .send()
             .await
             .expect("Got no response from server");
-        println!("Response : {:?}", res);
+
+        println!("Response : {:?}", &res);
+
+        let bytes = res.bytes().await.expect("No Bytes in response");
+
+        let body = std::str::from_utf8(&bytes).expect("Could not convert response to string");
+
+        println!("Response body is : {}", body);
 
         // Keep checking for updates -- main loop
     });
