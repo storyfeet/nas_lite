@@ -11,6 +11,8 @@ use diesel_async::{
     sync_connection_wrapper::SyncConnectionWrapper,
 };
 
+use crate::errors::NasRes;
+
 use err_tools::{traceable::*, *};
 
 async fn hello() -> &'static str {
@@ -86,4 +88,8 @@ pub fn run_server() -> Result<(), TraceError> {
     });
 
     Result::<(), TraceError>::Ok(())
+}
+
+async fn login(Path((name, pass)): Path<(String, String)>) -> NasRes<String> {
+    return NasRes::ok("Hello".to_string());
 }

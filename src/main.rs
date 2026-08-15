@@ -1,4 +1,5 @@
 mod client;
+mod errors;
 mod models;
 mod schema;
 mod server;
