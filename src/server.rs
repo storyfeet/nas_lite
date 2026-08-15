@@ -1,7 +1,7 @@
 use anyhow::*;
 use axum::{
     Router,
-    extract::{Path, State},
+    extract::{Json, Path, State},
     routing::{get, post},
 };
 use diesel::{prelude::*, sqlite::SqliteConnection};
@@ -11,7 +11,8 @@ use diesel_async::{
     sync_connection_wrapper::SyncConnectionWrapper,
 };
 
-use crate::errors::NasRes;
+use crate::errors::{ResponseResult, res_ok, trace_ok};
+use crate::{common_types::*, models::User};
 
 use err_tools::{traceable::*, *};
 
@@ -77,7 +78,7 @@ pub fn run_server() -> Result<(), TraceError> {
         let app = Router::new()
             .route("/", get(hello))
             .route("/check/{name}/{pass}", get(check_pass))
-            .route("/login", post(hello))
+            .route("/login", post(login))
             .with_state(pool);
 
         // run our app with hyper, listening globally on port 3000
@@ -90,6 +91,44 @@ pub fn run_server() -> Result<(), TraceError> {
     Result::<(), TraceError>::Ok(())
 }
 
-async fn login(Path((name, pass)): Path<(String, String)>) -> NasRes<String> {
-    return NasRes::ok("Hello".to_string());
+async fn login(
+    State(cpool): State<CPool>,
+    Json(user_pass): Json<UserPassword2>,
+) -> ResponseResult<String> {
+    let _up = check_user_pass(user_pass, cpool).await?;
+    return res_ok("Hello".to_string());
+}
+
+async fn check_user_pass(
+    user_pass: UserPassword2,
+    cpool: CPool,
+) -> Result<Option<i32>, TraceError> {
+    use crate::models::User;
+    use crate::schema::users::dsl::*;
+
+    let mut con = cpool
+        .get()
+        .await
+        .map_err(any_wrap!("Could not access connection pool"))?;
+
+    let user_list = users
+        .filter(user_name.eq(&user_pass.name))
+        .limit(5)
+        .select(User::as_select())
+        .load(&mut con)
+        .await
+        .map_err(any_wrap!(
+            "Could not run load user by name {}",
+            &user_pass.name
+        ))?;
+
+    for user in user_list {
+        if bcrypt::verify(&user_pass.password, &user.password_hash)
+            .map_err(any_wrap!("BCrypt couldn't be used to verify password"))?
+        {
+            return trace_ok(Some(user.id));
+        }
+    }
+
+    trace_ok(None)
 }

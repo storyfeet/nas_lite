@@ -1,9 +1,11 @@
 mod client;
+mod common_types;
 mod errors;
 mod models;
 mod schema;
 mod server;
 
+use self::common_types::UserPassword;
 use self::models::User;
 use diesel::prelude::*;
 use err_tools::{traceable::*, *};
@@ -18,13 +20,6 @@ enum Opt {
     CheckPassword(UserPassword),
     Serve,
     Client(self::client::ClientArgs),
-}
-
-#[derive(Debug, StructOpt)]
-#[structopt()]
-struct UserPassword {
-    name: String,
-    password: String,
 }
 
 fn main() -> Result<(), TraceError> {

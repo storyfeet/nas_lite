@@ -34,3 +34,31 @@ impl<T: IntoResponse> From<Result<T, TraceError>> for NasRes<T> {
         NasRes(value)
     }
 }
+
+pub fn trace_ok<T>(t: T) -> Result<T, TraceError> {
+    Result::<T, TraceError>::Ok(t)
+}
+
+pub type ResponseResult<T> = Result<T, ResponseError>;
+
+pub fn res_ok<T>(t: T) -> ResponseResult<T> {
+    ResponseResult::Ok(t)
+}
+
+pub fn res_err<T>(e: TraceError) -> ResponseResult<T> {
+    ResponseResult::Err(ResponseError(e))
+}
+
+pub struct ResponseError(TraceError);
+
+impl From<TraceError> for ResponseError {
+    fn from(t: TraceError) -> ResponseError {
+        ResponseError(t)
+    }
+}
+
+impl IntoResponse for ResponseError {
+    fn into_response(self) -> axum::response::Response {
+        (StatusCode::INTERNAL_SERVER_ERROR, self.0.to_string()).into_response()
+    }
+}
