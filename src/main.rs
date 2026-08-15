@@ -1,3 +1,4 @@
+mod client;
 mod models;
 mod schema;
 mod server;
@@ -15,6 +16,7 @@ enum Opt {
     AddUser(UserPassword),
     CheckPassword(UserPassword),
     Serve,
+    Client(self::client::ClientArgs),
 }
 
 #[derive(Debug, StructOpt)]
@@ -35,6 +37,7 @@ fn main() -> Result<(), TraceError> {
             _ = check_password(u)?;
         }
         Opt::Serve => return self::server::run_server(),
+        Opt::Client(cd) => return self::client::run_client(cd),
     }
     Result::<(), TraceError>::Ok(())
 }

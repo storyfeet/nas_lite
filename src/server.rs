@@ -2,11 +2,11 @@ use anyhow::*;
 use axum::{
     Router,
     extract::{Path, State},
-    routing::get,
+    routing::{get, post},
 };
 use diesel::{prelude::*, sqlite::SqliteConnection};
 use diesel_async::{
-    AsyncConnection, RunQueryDsl,
+    RunQueryDsl,
     pooled_connection::{AsyncDieselConnectionManager, bb8::Pool},
     sync_connection_wrapper::SyncConnectionWrapper,
 };
@@ -75,10 +75,13 @@ pub fn run_server() -> Result<(), TraceError> {
         let app = Router::new()
             .route("/", get(hello))
             .route("/check/{name}/{pass}", get(check_pass))
+            .route("/login", post(hello))
             .with_state(pool);
 
         // run our app with hyper, listening globally on port 3000
-        let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+        let listener = tokio::net::TcpListener::bind("localhost:3000")
+            .await
+            .unwrap();
         axum::serve(listener, app).await.unwrap();
     });
 
