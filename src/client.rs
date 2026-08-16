@@ -1,3 +1,4 @@
+use crate::common_types::UserPassword;
 use anyhow::*;
 use err_tools::{traceable::*, *};
 use structopt::StructOpt;
@@ -22,6 +23,10 @@ pub fn run_client(client_args: ClientArgs) -> Result<(), TraceError> {
         let client = reqwest::Client::new();
         let res = client
             .post(format!("{}/login", url))
+            .json(&UserPassword {
+                name: client_args.user_name,
+                password: client_args.password,
+            })
             .send()
             .await
             .expect("Got no response from server");

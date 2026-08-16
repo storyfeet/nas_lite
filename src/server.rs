@@ -11,8 +11,8 @@ use diesel_async::{
     sync_connection_wrapper::SyncConnectionWrapper,
 };
 
+use crate::common_types::*;
 use crate::errors::{ResponseResult, res_ok, trace_ok};
-use crate::{common_types::*, models::User};
 
 use err_tools::{traceable::*, *};
 
@@ -93,16 +93,16 @@ pub fn run_server() -> Result<(), TraceError> {
 
 async fn login(
     State(cpool): State<CPool>,
-    Json(user_pass): Json<UserPassword2>,
+    Json(user_pass): Json<UserPassword>,
 ) -> ResponseResult<String> {
-    let _up = check_user_pass(user_pass, cpool).await?;
-    return res_ok("Hello".to_string());
+    let check = check_user_pass(user_pass, cpool).await?;
+    match check {
+        Some(id) => res_ok(id.to_string()),
+        None => res_ok("User not found".to_string()),
+    }
 }
 
-async fn check_user_pass(
-    user_pass: UserPassword2,
-    cpool: CPool,
-) -> Result<Option<i32>, TraceError> {
+async fn check_user_pass(user_pass: UserPassword, cpool: CPool) -> Result<Option<i32>, TraceError> {
     use crate::models::User;
     use crate::schema::users::dsl::*;
 
