@@ -4,6 +4,7 @@ mod errors;
 mod models;
 mod schema;
 mod server;
+mod session;
 
 use self::common_types::UserPassword;
 use self::models::User;

@@ -1,5 +1,5 @@
+use chrono::naive::NaiveDateTime;
 use diesel::prelude::*;
-//use chrono::{naive::{NaiveDateTime}};
 
 #[derive(Queryable, Insertable)]
 #[diesel(table_name = crate::schema::users)]
@@ -18,4 +18,14 @@ pub struct User {
     pub password_hash: String,
     //pub created:NaiveDateTime,
     //pub modified:NaiveDateTime,
+}
+
+#[derive(Queryable, Selectable, Insertable)]
+#[diesel(table_name = crate::schema::sessions)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct NewSession {
+    pub token: String,
+    pub token_pass: String,
+    pub user_id: i32,
+    pub expires: NaiveDateTime,
 }

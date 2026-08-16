@@ -1111,6 +1111,7 @@ dependencies = [
  "diesel-async",
  "dotenvy",
  "err_tools",
+ "rand",
  "reqwest",
  "serde",
  "structopt",

@@ -10,3 +10,11 @@ pub struct UserPassword {
     pub name: String,
     pub password: String,
 }
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+
+pub struct SessionData {
+    pub token: String,
+    pub token_pass: String,
+    pub expires: String,
+}

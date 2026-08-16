@@ -2,6 +2,7 @@ use anyhow::*;
 use axum::{
     Router,
     extract::{Json, Path, State},
+    response,
     routing::{get, post},
 };
 use diesel::{prelude::*, sqlite::SqliteConnection};
@@ -92,17 +93,22 @@ pub fn run_server() -> Result<(), TraceError> {
 }
 
 async fn login(
-    State(cpool): State<CPool>,
+    State(mut cpool): State<CPool>,
     Json(user_pass): Json<UserPassword>,
-) -> ResponseResult<String> {
-    let check = check_user_pass(user_pass, cpool).await?;
-    match check {
-        Some(id) => res_ok(id.to_string()),
-        None => res_ok("User not found".to_string()),
-    }
+) -> ResponseResult<response::Json<SessionData>> {
+    let check = check_user_pass(user_pass, &mut cpool)
+        .await? //Result
+        .ok_or::<TraceError>(err_at!("User Password not found"))?;
+
+    let sess = create_user_session(check, &mut cpool).await?;
+
+    res_ok(response::Json(sess))
 }
 
-async fn check_user_pass(user_pass: UserPassword, cpool: CPool) -> Result<Option<i32>, TraceError> {
+async fn check_user_pass(
+    user_pass: UserPassword,
+    cpool: &mut CPool,
+) -> Result<Option<i32>, TraceError> {
     use crate::models::User;
     use crate::schema::users::dsl::*;
 
@@ -131,4 +137,25 @@ async fn check_user_pass(user_pass: UserPassword, cpool: CPool) -> Result<Option
     }
 
     trace_ok(None)
+}
+
+async fn create_user_session(user_id: i32, cpool: &mut CPool) -> Result<SessionData, TraceError> {
+    let mut con = cpool
+        .get()
+        .await
+        .map_err(any_wrap!("Could not access connection pool"))?;
+
+    let new_session = crate::session::new_session(user_id);
+
+    diesel::insert_into(crate::schema::sessions::table)
+        .values(&new_session)
+        .execute(&mut con)
+        .await
+        .map_err(any_wrap!("Could not insert new session"))?;
+
+    return trace_ok(SessionData {
+        token: new_session.token,
+        token_pass: new_session.token_pass,
+        expires: new_session.expires.and_utc().to_rfc3339(),
+    });
 }
