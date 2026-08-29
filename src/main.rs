@@ -1,4 +1,5 @@
 mod client;
+mod client_config;
 mod common_types;
 mod errors;
 mod models;
