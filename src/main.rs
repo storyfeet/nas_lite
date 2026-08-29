@@ -1,7 +1,9 @@
 mod client;
 mod client_config;
+mod client_folder;
 mod common_types;
 mod errors;
+mod hasher;
 mod models;
 mod schema;
 mod server;
