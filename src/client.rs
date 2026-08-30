@@ -1,4 +1,3 @@
-use crate::client_config;
 use crate::common_types::UserPassword;
 use crate::errors::trace_ok;
 use anyhow::*;
@@ -15,7 +14,7 @@ pub fn run_client(client_args: ClientArgs) -> Result<(), TraceError> {
 
     rt.block_on(async {
         match run_async_client(client_args).await {
-            Result::Ok(v) => println!("Server finished happy"),
+            Result::Ok(_v) => println!("Server finished happy"),
             Result::Err(e) => println!("There was an error running the server : {}", e),
         }
         // Open session - get tokens
