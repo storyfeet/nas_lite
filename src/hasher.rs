@@ -1,4 +1,7 @@
-use std::pin::{Pin, pin};
+use std::{
+    path::Path,
+    pin::{Pin, pin},
+};
 use tokio::io::{AsyncRead, AsyncReadExt};
 
 pub async fn hash<R: AsyncRead>(mut reader: Pin<&mut R>) -> Result<String, tokio::io::Error> {
@@ -21,7 +24,21 @@ pub async fn hash<R: AsyncRead>(mut reader: Pin<&mut R>) -> Result<String, tokio
     }
 }
 
-pub async fn hash_file_by_path(path: &str) -> Result<String, tokio::io::Error> {
+pub fn hash_hashes<'a, R: AsRef<str>>(hashes: &'a [R]) -> String {
+    // Sort the hashes to make sure the result is consistent for any order
+    let mut hvec: Vec<&'a str> = hashes.iter().map(|s| s.as_ref()).collect();
+
+    hvec.sort();
+
+    let mut b_hasher = blake3::Hasher::new();
+    for hash in hvec {
+        b_hasher.update(hash.as_bytes());
+    }
+
+    b_hasher.finalize().to_string()
+}
+
+pub async fn hash_file_by_path<P: AsRef<Path>>(path: P) -> Result<String, tokio::io::Error> {
     let reader = tokio::fs::OpenOptions::new().read(true).open(path).await?;
 
     hash(pin!(reader)).await
@@ -36,8 +53,16 @@ mod test {
         let rt = tokio::runtime::Runtime::new().expect("Could not start runtime");
 
         rt.block_on(async {
-            let res = hash_file_by_path("./data/simple_file_for_tests.txt");
+            let res = hash_file_by_path::<&str>("./data/simple_file_for_tests.txt");
             assert_eq!(64, res.await.unwrap().len());
         });
+    }
+
+    #[test]
+    pub fn hash_hashes_sorts_correctly() {
+        let a = hash_hashes(&["123", "456", "hello"]);
+        let b = hash_hashes(&["hello", "456", "123"]);
+
+        assert_eq!(a, b);
     }
 }
