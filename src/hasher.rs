@@ -24,6 +24,13 @@ pub async fn hash<R: AsyncRead>(mut reader: Pin<&mut R>) -> Result<String, tokio
     }
 }
 
+pub fn hash_bytes(data: &[u8]) -> String {
+    let mut b_hasher = blake3::Hasher::new();
+    b_hasher.update(data);
+    // Note if updating , update all finalizes to match
+    b_hasher.finalize().to_string()
+}
+
 pub fn hash_hashes<'a, R: AsRef<str>>(hashes: &'a [R]) -> String {
     // Sort the hashes to make sure the result is consistent for any order
     let mut hvec: Vec<&'a str> = hashes.iter().map(|s| s.as_ref()).collect();

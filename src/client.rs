@@ -1,7 +1,8 @@
-use crate::common_types::UserPassword;
 use crate::errors::trace_ok;
+use crate::{client_folder::walk_folder, common_types::UserPassword};
 use anyhow::*;
 use err_tools::{traceable::*, *};
+use std::path::PathBuf;
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -26,6 +27,26 @@ pub fn run_client(client_args: ClientArgs) -> Result<(), TraceError> {
 pub async fn run_async_client(client_args: ClientArgs) -> TraceResult<()> {
     let config = crate::client_config::loadConfig(&client_args.config).await?;
     let client = reqwest::Client::new();
+
+    // Get graph of local system
+
+    let mut handles = Vec::new();
+    for folder in &config.folders {
+        handles.push(tokio::spawn(walk_folder(
+            PathBuf::from(&folder.local_path),
+            "root".to_string(),
+        )))
+    }
+
+    for handle in handles {
+        match handle.await.unwrap() {
+            Result::Ok(t) => {
+                println!("{} : {} ", t.name, t.to_rep_string())
+            }
+            Result::Err(_) => {}
+        }
+    }
+
     let res = client
         .post(format!("{}/login", &config.url))
         .json(&UserPassword {

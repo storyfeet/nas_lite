@@ -2,6 +2,8 @@ use chrono::NaiveDateTime;
 use std::path::PathBuf;
 use tokio::io::Error as IOError;
 
+use iter_tools::Itertools;
+
 type FolderResult = Result<FolderData, IOError>;
 
 #[derive(Debug)]
@@ -60,9 +62,10 @@ pub fn walk_folder(path: PathBuf, root_name: String) -> impl Future<Output = Fol
                     Err(e) => errs.push(e),
                 }
             }
-            let hashes: Vec<&str> = children.iter().map(|c| c.hash.as_str()).collect();
 
-            let folder_hash = crate::hasher::hash_hashes(&hashes);
+            let ch_rep = represent_children(&children);
+
+            let folder_hash = crate::hasher::hash_bytes(ch_rep.as_bytes());
 
             return Ok(FolderData {
                 f_type: FileType::File,
@@ -90,4 +93,39 @@ fn system_time_to_naive_date(sys_time: std::time::SystemTime) -> chrono::NaiveDa
         Err(e) => e.duration().as_nanos(),
     };
     chrono::DateTime::from_timestamp_nanos(nanos as i64).naive_utc()
+}
+
+pub fn represent_children(children: &[FolderData]) -> String {
+    let mut files: Vec<&FolderData> = children.iter().collect();
+
+    files.sort_by(|a, b| a.name.cmp(&b.name));
+
+    files
+        .iter()
+        .map(|fd| format!("{},{}", fd.hash, fd.name))
+        .join("\n")
+}
+
+impl FolderData {
+    /**
+     * Build the string file that represents the folder
+     */
+    pub fn to_rep_string(&self) -> String {
+        let mut result = String::new();
+
+        result.push_str(&format!("FOLDER:{}\n", self.name));
+
+        let mut files: Vec<&FolderData> = self.files.iter().collect();
+
+        files.sort_by(|a, b| a.name.cmp(&b.name));
+
+        let lines: String = files
+            .iter()
+            .map(|fd| format!("{},{}", fd.hash, fd.name))
+            .join("\n");
+
+        result.push_str(&lines);
+
+        result
+    }
 }

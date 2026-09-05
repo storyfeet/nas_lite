@@ -12,8 +12,8 @@ pub struct LocalConfig {
 
 #[derive(serde::Deserialize)]
 pub struct LocalFolder {
-    local_path: String,
-    server_path: String,
+    pub local_path: String,
+    pub server_path: String,
 }
 
 pub async fn loadConfig(filename: &str) -> TraceResult<LocalConfig> {

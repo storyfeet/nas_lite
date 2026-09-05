@@ -294,6 +294,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "clone_dyn_types"
+version = "0.48.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5226d8fe69efe07200ea831d71b9d8fbfb1a894945fc4a44f41df17575de099f"
+
+[[package]]
 name = "cmake"
 version = "0.1.58"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -971,6 +977,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6a756c3fac73139e83f14c2d742155dd2b78d3ee56597b419a0579b7bdd6dd78"
 
 [[package]]
+name = "iter_tools"
+version = "0.50.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32403e96b23e11832956d1e989f5f9c0f2aa43bd8324c24f586dc0c8ccb1010e"
+dependencies = [
+ "clone_dyn_types",
+ "itertools",
+]
+
+[[package]]
+name = "itertools"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1c173a5686ce8bfa551b3563d0c2170bf24ca44da99c7ca4bfdab5418c3fe57"
+dependencies = [
+ "either",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1137,6 +1162,7 @@ dependencies = [
  "diesel-async",
  "dotenvy",
  "err_tools",
+ "iter_tools",
  "rand",
  "reqwest",
  "serde",
