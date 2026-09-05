@@ -1,0 +1,11 @@
+{
+    "user_name": "matt",
+    "password": "do thing",
+    "url": "localhost:8080",
+    "folders": [
+        {
+            "local_path":"./test_data/main",
+            "server_path" : "main"
+        }
+    ]
+}
