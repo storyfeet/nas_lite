@@ -1,5 +1,7 @@
 use chrono::NaiveDateTime;
-use std::path::PathBuf;
+use std::borrow::Cow;
+use std::fs::Metadata;
+use std::path::{Path, PathBuf};
 use tokio::io::Error as IOError;
 
 use iter_tools::Itertools;
@@ -7,49 +9,44 @@ use iter_tools::Itertools;
 type FolderResult = Result<FolderData, IOError>;
 
 #[derive(Debug)]
-pub enum FileType {
-    File,
-    Folder,
-    Link,
+pub enum Content {
+    File(PathBuf),
+    Folder(FolderContent),
+    Link(PathBuf),
+}
+
+/**
+ * Only what is in the folder, and is relevant for the hash
+ */
+#[derive(Debug)]
+pub struct FolderContent {
+    oks: Vec<FolderData>,
+    errs: Vec<tokio::io::Error>,
 }
 
 #[derive(Debug)]
 pub struct FolderData {
-    pub f_type: FileType,
     pub hash: String,
     pub name: String,
-    pub files: Vec<FolderData>,
+    pub content: Content,
     pub modified: NaiveDateTime,
-    pub errors: Vec<tokio::io::Error>,
 }
 
-pub fn walk_folder(path: PathBuf, root_name: String) -> impl Future<Output = FolderResult> + Send {
-    // Note the inner async block, is a workaround to handle the recursive call.
-    // as otherwise the autotrait, Send is not assigned to the future
-    // FROM : https://stackoverflow.com/questions/78990686/recursive-async-function-future-cannot-be-sent-between-threads-safely
+pub fn content(
+    pathbuf: PathBuf,
+    meta: &Metadata,
+) -> impl Future<Output = Result<Content, IOError>> + Send {
     async {
-        let pbuf = path;
-        let root_meta = tokio::fs::metadata(&pbuf).await?;
-        if root_meta.is_file() {
-            let hash = crate::hasher::hash_file_by_path(&pbuf).await?;
-            return Ok(FolderData {
-                f_type: FileType::File,
-                hash,
-                name: root_name,
-                files: Vec::new(),
-                modified: root_meta
-                    .modified()
-                    .map(system_time_to_naive_date)
-                    .expect("file has no modified date"),
-                errors: Vec::new(),
-            });
+        let path = pathbuf.as_path();
+        if meta.is_file() {
+            return Ok(Content::File(pathbuf));
         }
 
-        if root_meta.is_dir() {
-            let mut dir = tokio::fs::read_dir(&pbuf).await?;
+        if meta.is_dir() {
+            let mut dir = tokio::fs::read_dir(path).await?;
             let mut handles = Vec::new();
             while let Some(entry) = dir.next_entry().await? {
-                let inner_path = pbuf.join(entry.file_name());
+                let inner_path = path.join(entry.file_name());
                 let inner_name = entry.file_name().to_string_lossy().to_string();
                 handles.push(tokio::spawn(walk_folder(inner_path, inner_name)));
             }
@@ -63,27 +60,37 @@ pub fn walk_folder(path: PathBuf, root_name: String) -> impl Future<Output = Fol
                 }
             }
 
-            let ch_rep = represent_children(&children);
-
-            let folder_hash = crate::hasher::hash_bytes(ch_rep.as_bytes());
-
-            return Ok(FolderData {
-                f_type: FileType::File,
-                hash: folder_hash,
-                name: root_name,
-                files: children,
-                modified: root_meta
-                    .modified()
-                    .map(system_time_to_naive_date)
-                    .expect("file has no modified date"),
-                errors: errs,
-            });
+            return Ok(Content::Folder(FolderContent {
+                oks: children,
+                errs: errs,
+            }));
         }
 
         Err(tokio::io::Error::new(
             tokio::io::ErrorKind::Unsupported,
             err_tools::SError("Not a file or folder"),
         ))
+    }
+}
+
+pub fn walk_folder(path: PathBuf, root_name: String) -> impl Future<Output = FolderResult> + Send {
+    // Note the inner async block, is a workaround to handle the recursive call.
+    // as otherwise the autotrait, Send is not assigned to the future
+    // FROM : https://stackoverflow.com/questions/78990686/recursive-async-function-future-cannot-be-sent-between-threads-safely
+    async {
+        let root_meta = tokio::fs::metadata(&path).await?;
+        let f_content = content(path, &root_meta).await?;
+        let hash = f_content.to_hash().await; // This may need a try later on path
+
+        Ok(FolderData {
+            content: f_content,
+            hash: hash,
+            name: root_name,
+            modified: root_meta
+                .modified()
+                .map(system_time_to_naive_date)
+                .expect("file has no modified date"),
+        })
     }
 }
 
@@ -106,26 +113,35 @@ pub fn represent_children(children: &[FolderData]) -> String {
         .join("\n")
 }
 
-impl FolderData {
-    /**
-     * Build the string file that represents the folder
-     */
+impl Content {
+    pub async fn to_hash(&self) -> String {
+        match self {
+            Content::File(pbuf) => crate::hasher::hash_file_by_path(pbuf)
+                .await
+                .expect("Hashing file doesn;t exist"),
+            Content::Folder(c) => crate::hasher::hash_bytes(c.to_rep_string().as_bytes()),
+            Content::Link(_) => unimplemented!("Sim links will be a challenge"),
+        }
+    }
+
+    pub async fn to_rep_bytes(&self) -> Vec<u8> {
+        match self {
+            Content::File(pbuf) => tokio::fs::read(pbuf).await.unwrap_or(b"no_bytes".to_vec()),
+            Content::Folder(c) => c.to_rep_string().as_bytes().to_vec(),
+            Content::Link(_) => unimplemented!("Sim links will be a challenge"),
+        }
+    }
+}
+
+impl FolderContent {
     pub fn to_rep_string(&self) -> String {
-        let mut result = String::new();
-
-        result.push_str(&format!("FOLDER:{}\n", self.name));
-
-        let mut files: Vec<&FolderData> = self.files.iter().collect();
+        let mut files: Vec<&FolderData> = self.oks.iter().collect();
 
         files.sort_by(|a, b| a.name.cmp(&b.name));
 
-        let lines: String = files
+        files
             .iter()
             .map(|fd| format!("{},{}", fd.hash, fd.name))
-            .join("\n");
-
-        result.push_str(&lines);
-
-        result
+            .join("\n")
     }
 }

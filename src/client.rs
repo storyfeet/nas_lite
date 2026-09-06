@@ -25,7 +25,7 @@ pub fn run_client(client_args: ClientArgs) -> Result<(), TraceError> {
 }
 
 pub async fn run_async_client(client_args: ClientArgs) -> TraceResult<()> {
-    let config = crate::client_config::loadConfig(&client_args.config).await?;
+    let config = crate::client_config::load_config(&client_args.config).await?;
     let client = reqwest::Client::new();
 
     // Get graph of local system
@@ -41,7 +41,11 @@ pub async fn run_async_client(client_args: ClientArgs) -> TraceResult<()> {
     for handle in handles {
         match handle.await.unwrap() {
             Result::Ok(t) => {
-                println!("{} : {} ", t.name, t.to_rep_string())
+                println!(
+                    "{} : {} ",
+                    t.name,
+                    String::from_utf8_lossy(&t.content.to_rep_bytes().await)
+                )
             }
             Result::Err(_) => {}
         }

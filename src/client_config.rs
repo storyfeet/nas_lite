@@ -16,7 +16,7 @@ pub struct LocalFolder {
     pub server_path: String,
 }
 
-pub async fn loadConfig(filename: &str) -> TraceResult<LocalConfig> {
+pub async fn load_config(filename: &str) -> TraceResult<LocalConfig> {
     let config_str = tokio::fs::read(filename)
         .await
         .map_err(any_wrap!("Could not read config file: {}", filename))?;
