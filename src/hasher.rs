@@ -1,8 +1,22 @@
+use base64::{Engine as _, engine::general_purpose::URL_SAFE};
 use std::{
     path::Path,
     pin::{Pin, pin},
 };
 use tokio::io::{AsyncRead, AsyncReadExt};
+
+/**
+ * Provides the standardized output format for all hashed in this sustem.
+ */
+fn to_output(b_hasher: blake3::Hasher) -> String {
+    use std::io::Read;
+    let mut buf: [u8; 39] = [0; 39];
+    let mut b_read = b_hasher.finalize_xof();
+    b_read
+        .read(&mut buf)
+        .expect("String Buffer should not fail to read bytes in from hasher");
+    URL_SAFE.encode(&buf)
+}
 
 pub async fn hash<R: AsyncRead>(mut reader: Pin<&mut R>) -> Result<String, tokio::io::Error> {
     let mut buf: [u8; 10000] = [0; 10000];
@@ -12,7 +26,7 @@ pub async fn hash<R: AsyncRead>(mut reader: Pin<&mut R>) -> Result<String, tokio
     loop {
         match reader.as_mut().read(&mut buf).await {
             Ok(0) => {
-                return Ok(b_hasher.finalize().to_string());
+                return Ok(to_output(b_hasher));
             }
             Ok(num_bytes) => {
                 b_hasher.update(&buf[0..num_bytes]);
@@ -28,7 +42,7 @@ pub fn hash_bytes(data: &[u8]) -> String {
     let mut b_hasher = blake3::Hasher::new();
     b_hasher.update(data);
     // Note if updating , update all finalizes to match
-    b_hasher.finalize().to_string()
+    to_output(b_hasher)
 }
 
 pub fn hash_hashes<'a, R: AsRef<str>>(hashes: &'a [R]) -> String {
