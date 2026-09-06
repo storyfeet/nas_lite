@@ -10,7 +10,7 @@ use tokio::io::{AsyncRead, AsyncReadExt};
  */
 fn to_output(b_hasher: blake3::Hasher) -> String {
     use std::io::Read;
-    let mut buf: [u8; 39] = [0; 39];
+    let mut buf: [u8; 48] = [0; 48];
     let mut b_read = b_hasher.finalize_xof();
     b_read
         .read(&mut buf)
