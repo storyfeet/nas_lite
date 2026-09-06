@@ -1,7 +1,6 @@
 use chrono::NaiveDateTime;
-use std::borrow::Cow;
 use std::fs::Metadata;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use tokio::io::Error as IOError;
 
 use iter_tools::Itertools;
