@@ -9,7 +9,7 @@ axum = "0.8.9"
 base64 = "0.23.1"
 bcrypt = "0.19.3"
 blake3 = "1.8.7"
-chrono = "0.4.45"
+chrono = {version = "0.4.45", features = ["serde"]}
 diesel = {version = "2.3.12" , features = ["sqlite","chrono"]}
 diesel-async = {version = "0.9.2", features = ["sync-connection-wrapper","sqlite","tokio","pool","bb8"]}
 dotenvy = "0.15.7"

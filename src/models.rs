@@ -1,5 +1,7 @@
+use crate::common_types as CT;
 use chrono::naive::NaiveDateTime;
 use diesel::prelude::*;
+use serde::{Deserialize, Serialize};
 
 #[derive(Queryable, Insertable)]
 #[diesel(table_name = crate::schema::users)]
@@ -28,4 +30,21 @@ pub struct NewSession {
     pub token_pass: String,
     pub user_id: i32,
     pub expires: NaiveDateTime,
+}
+
+#[derive(Queryable, Selectable, Insertable, Serialize, Deserialize)]
+#[diesel(table_name = crate::schema::files)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct File {
+    pub id: i32,
+    pub file_type: CT::FileType,
+    pub file_name: String,
+    pub file_size: i32,
+    pub chunk_size: i32,
+    pub chunks_loaded: i32,
+    pub file_hash: String,
+    pub completed: Option<NaiveDateTime>,
+    pub created: NaiveDateTime,
+    pub modified: NaiveDateTime,
+    pub deleted: Option<NaiveDateTime>,
 }

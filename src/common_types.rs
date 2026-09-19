@@ -2,7 +2,13 @@
  * This module provides classes to be used by both client server as a means of communication.
  */
 use base64::{Engine as _, engine::general_purpose::URL_SAFE};
+use diesel::deserialize::{FromSql, FromSqlRow};
+use diesel::expression::AsExpression;
+use diesel::serialize::{IsNull, ToSql};
+use diesel::sql_types::Text;
+use diesel::sqlite::Sqlite;
 use serde::{Deserialize, Serialize, de::Visitor};
+
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt, Deserialize, Clone, Serialize)]
@@ -27,6 +33,13 @@ pub struct Token {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UploadState {
+    sections: u64,
+    chunk_size: u64,
+    current_chunks: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileUpload {
     token: Token,
     file_name: String,
@@ -34,6 +47,40 @@ pub struct FileUpload {
     byte_start: u64,
     byte_end: u64,
     data: Chunk,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, AsExpression, FromSqlRow)]
+#[diesel(sql_type=Text)]
+pub enum FileType {
+    File,
+    Folder,
+    Other,
+}
+
+impl ToSql<Text, Sqlite> for FileType {
+    fn to_sql<'b>(
+        &'b self,
+        out: &mut diesel::serialize::Output<'b, '_, Sqlite>,
+    ) -> diesel::serialize::Result {
+        match self {
+            Self::File => out.set_value("file"),
+            Self::Folder => out.set_value("folder"),
+            Self::Other => out.set_value("other"),
+        };
+        Ok(IsNull::No)
+    }
+}
+
+impl FromSql<Text, Sqlite> for FileType {
+    fn from_sql(
+        mut bytes: <Sqlite as diesel::backend::Backend>::RawValue<'_>,
+    ) -> diesel::deserialize::Result<Self> {
+        match bytes.read_text() {
+            "file" => Ok(Self::File),
+            "folder" => Ok(Self::Folder),
+            _ => Ok(Self::Other),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
