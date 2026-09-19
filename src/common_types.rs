@@ -44,8 +44,9 @@ pub struct FileUpload {
     token: Token,
     file_name: String,
     file_hash: String,
-    byte_start: u64,
-    byte_end: u64,
+    file_size: u64,
+    chunk_size: u64,
+    chunk_num: u64,
     data: Chunk,
 }
 
@@ -139,8 +140,9 @@ pub mod test_common_types {
             },
             file_hash: "abc".to_string(),
             file_name: "fname".to_string(),
-            byte_start: 0,
-            byte_end: 100,
+            file_size: 100,
+            chunk_size: 100,
+            chunk_num: 0,
             data: Chunk(b"make a pie".to_vec()),
         };
 

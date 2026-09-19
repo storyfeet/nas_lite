@@ -108,7 +108,7 @@ async fn login(
 async fn check_user_pass(
     user_pass: UserPassword,
     cpool: &mut CPool,
-) -> Result<Option<i32>, TraceError> {
+) -> Result<Option<i64>, TraceError> {
     use crate::models::User;
     use crate::schema::users::dsl::*;
 
@@ -139,7 +139,7 @@ async fn check_user_pass(
     trace_ok(None)
 }
 
-async fn create_user_session(user_id: i32, cpool: &mut CPool) -> Result<SessionData, TraceError> {
+async fn create_user_session(user_id: i64, cpool: &mut CPool) -> Result<SessionData, TraceError> {
     let mut con = cpool
         .get()
         .await

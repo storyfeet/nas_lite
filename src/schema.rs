@@ -2,12 +2,12 @@
 
 diesel::table! {
     files (id) {
-        id -> Integer,
-        user_id -> Integer,
+        id -> BigInt,
+        user_id -> BigInt,
         file_name -> Text,
         file_type -> Text,
-        file_size -> Integer,
-        chunk_size -> Integer,
+        file_size -> BigInt,
+        chunk_size -> BigInt,
         chunks_loaded -> Integer,
         file_hash -> Text,
         completed -> Nullable<Timestamp>,
@@ -19,10 +19,10 @@ diesel::table! {
 
 diesel::table! {
     sessions (id) {
-        id -> Integer,
+        id -> BigInt,
         token -> Text,
         token_pass -> Text,
-        user_id -> Integer,
+        user_id -> BigInt,
         created -> Timestamp,
         expires -> Timestamp,
     }
@@ -30,7 +30,7 @@ diesel::table! {
 
 diesel::table! {
     users (id) {
-        id -> Integer,
+        id -> BigInt,
         created -> Timestamp,
         modified -> Timestamp,
         user_name -> Text,
