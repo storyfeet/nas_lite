@@ -1,10 +1,11 @@
 use crate::common_types as CT;
+use crate::schema as SCH;
 use chrono::naive::NaiveDateTime;
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Queryable, Insertable)]
-#[diesel(table_name = crate::schema::users)]
+#[diesel(table_name = SCH::users)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct NewUser {
     pub user_name: String,
@@ -12,7 +13,7 @@ pub struct NewUser {
 }
 
 #[derive(Queryable, Selectable)]
-#[diesel(table_name = crate::schema::users)]
+#[diesel(table_name = SCH::users)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct User {
     pub id: i64,
@@ -23,13 +24,24 @@ pub struct User {
 }
 
 #[derive(Queryable, Selectable, Insertable)]
-#[diesel(table_name = crate::schema::sessions)]
+#[diesel(table_name = SCH::sessions)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct NewSession {
     pub token: String,
     pub token_pass: String,
     pub user_id: i64,
     pub expires: NaiveDateTime,
+}
+
+#[derive(Queryable, Selectable)]
+#[diesel(table_name = SCH::sessions)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct LoadedSession {
+    pub expires: NaiveDateTime,
+    #[diesel(select_expression = SCH::users::id)]
+    pub id: i64,
+    #[diesel(select_expression = SCH::users::user_name)]
+    pub user_name: String,
 }
 
 #[derive(Queryable, Selectable, Insertable, Serialize, Deserialize)]

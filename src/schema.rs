@@ -18,8 +18,7 @@ diesel::table! {
 }
 
 diesel::table! {
-    sessions (id) {
-        id -> BigInt,
+    sessions (token) {
         token -> Text,
         token_pass -> Text,
         user_id -> BigInt,
@@ -39,3 +38,4 @@ diesel::table! {
 }
 
 diesel::allow_tables_to_appear_in_same_query!(files, sessions, users,);
+diesel::joinable!(sessions -> users(user_id));

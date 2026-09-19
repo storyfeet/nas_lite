@@ -1,3 +1,4 @@
+use crate::db_util as DB;
 use anyhow::*;
 use axum::{
     Router,
@@ -23,7 +24,7 @@ async fn hello() -> &'static str {
 
 async fn check_pass(
     Path((name, pass)): Path<(String, String)>,
-    State(cpool): State<CPool>,
+    State(cpool): State<DB::CPool>,
 ) -> String {
     //Result<String, TraceError> {
     use crate::models::User;
@@ -56,9 +57,6 @@ async fn check_pass(
     //return Result::<String, TraceError>::Ok(format!("Hello to {} - {}", name, pass));
 }
 
-type CManager = SyncConnectionWrapper<SqliteConnection>;
-type CPool = Pool<CManager>;
-
 pub fn run_server() -> Result<(), TraceError> {
     println!("Running Server");
 
@@ -70,8 +68,8 @@ pub fn run_server() -> Result<(), TraceError> {
     rt.block_on(async {
         //let connection = SyncConnectionWrapper::<SqliteConnection>::establish(&db_url).await.expect("Could not establish connection");
 
-        let manager = AsyncDieselConnectionManager::<CManager>::new(&db_url);
-        let pool: CPool = Pool::builder()
+        let manager = AsyncDieselConnectionManager::<DB::CManager>::new(&db_url);
+        let pool: DB::CPool = Pool::builder()
             .build(manager)
             .await
             .expect("Could not build connection pool");
@@ -93,21 +91,21 @@ pub fn run_server() -> Result<(), TraceError> {
 }
 
 async fn login(
-    State(mut cpool): State<CPool>,
+    State(mut cpool): State<DB::CPool>,
     Json(user_pass): Json<UserPassword>,
 ) -> ResponseResult<response::Json<SessionData>> {
     let check = check_user_pass(user_pass, &mut cpool)
         .await? //Result
         .ok_or::<TraceError>(err_at!("User Password not found"))?;
 
-    let sess = create_user_session(check, &mut cpool).await?;
+    let sess = crate::session::create_user_session(check, &mut cpool).await?;
 
     res_ok(response::Json(sess))
 }
 
 async fn check_user_pass(
     user_pass: UserPassword,
-    cpool: &mut CPool,
+    cpool: &mut DB::CPool,
 ) -> Result<Option<i64>, TraceError> {
     use crate::models::User;
     use crate::schema::users::dsl::*;
@@ -137,25 +135,4 @@ async fn check_user_pass(
     }
 
     trace_ok(None)
-}
-
-async fn create_user_session(user_id: i64, cpool: &mut CPool) -> Result<SessionData, TraceError> {
-    let mut con = cpool
-        .get()
-        .await
-        .map_err(any_wrap!("Could not access connection pool"))?;
-
-    let new_session = crate::session::new_session(user_id);
-
-    diesel::insert_into(crate::schema::sessions::table)
-        .values(&new_session)
-        .execute(&mut con)
-        .await
-        .map_err(any_wrap!("Could not insert new session"))?;
-
-    return trace_ok(SessionData {
-        token: new_session.token,
-        token_pass: new_session.token_pass,
-        expires: new_session.expires.and_utc().to_rfc3339(),
-    });
 }
