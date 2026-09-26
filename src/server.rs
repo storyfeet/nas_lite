@@ -6,15 +6,14 @@ use axum::{
     response,
     routing::{get, post},
 };
-use diesel::{prelude::*, sqlite::SqliteConnection};
+use diesel::prelude::*;
 use diesel_async::{
     RunQueryDsl,
     pooled_connection::{AsyncDieselConnectionManager, bb8::Pool},
-    sync_connection_wrapper::SyncConnectionWrapper,
 };
 
 use crate::common_types::*;
-use crate::errors::{ResponseResult, res_ok, trace_ok};
+use crate::errors::{ResponseResult, res_ok};
 
 use err_tools::{traceable::*, *};
 
@@ -94,45 +93,11 @@ async fn login(
     State(mut cpool): State<DB::CPool>,
     Json(user_pass): Json<UserPassword>,
 ) -> ResponseResult<response::Json<SessionData>> {
-    let check = check_user_pass(user_pass, &mut cpool)
+    let check = crate::session::check_user_pass(user_pass, &mut cpool)
         .await? //Result
         .ok_or::<TraceError>(err_at!("User Password not found"))?;
 
     let sess = crate::session::create_user_session(check, &mut cpool).await?;
 
     res_ok(response::Json(sess))
-}
-
-async fn check_user_pass(
-    user_pass: UserPassword,
-    cpool: &mut DB::CPool,
-) -> Result<Option<i64>, TraceError> {
-    use crate::models::User;
-    use crate::schema::users::dsl::*;
-
-    let mut con = cpool
-        .get()
-        .await
-        .map_err(any_wrap!("Could not access connection pool"))?;
-
-    let user_list = users
-        .filter(user_name.eq(&user_pass.name))
-        .limit(5)
-        .select(User::as_select())
-        .load(&mut con)
-        .await
-        .map_err(any_wrap!(
-            "Could not run load user by name {}",
-            &user_pass.name
-        ))?;
-
-    for user in user_list {
-        if bcrypt::verify(&user_pass.password, &user.password_hash)
-            .map_err(any_wrap!("BCrypt couldn't be used to verify password"))?
-        {
-            return trace_ok(Some(user.id));
-        }
-    }
-
-    trace_ok(None)
 }

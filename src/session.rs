@@ -5,12 +5,8 @@ use crate::models as MD;
 use crate::schema as SCH;
 use anyhow::*;
 use chrono::Utc;
-use diesel::{prelude::*, sqlite::SqliteConnection};
-use diesel_async::{
-    RunQueryDsl,
-    pooled_connection::{AsyncDieselConnectionManager, bb8::Pool},
-    sync_connection_wrapper::SyncConnectionWrapper,
-};
+use diesel::prelude::*;
+use diesel_async::RunQueryDsl;
 use err_tools::traceable::TraceError;
 use err_tools::{traceable::*, *};
 use rand::distr::{Alphanumeric, SampleString};
@@ -74,5 +70,39 @@ pub async fn check_session(
         .first(&mut con)
         .await
         .optional()
-        .map_err(any_wrap!("Could not session by key {}", &token.token))
+        .map_err(any_wrap!("Could not get session by key {}", &token.token))
+}
+
+pub async fn check_user_pass(
+    user_pass: CT::UserPassword,
+    cpool: &mut DB::CPool,
+) -> Result<Option<i64>, TraceError> {
+    use crate::models::User;
+    use crate::schema::users::dsl::*;
+
+    let mut con = cpool
+        .get()
+        .await
+        .map_err(any_wrap!("Could not access connection pool"))?;
+
+    let user_list = users
+        .filter(user_name.eq(&user_pass.name))
+        .limit(5)
+        .select(User::as_select())
+        .load(&mut con)
+        .await
+        .map_err(any_wrap!(
+            "Could not run load user by name {}",
+            &user_pass.name
+        ))?;
+
+    for user in user_list {
+        if bcrypt::verify(&user_pass.password, &user.password_hash)
+            .map_err(any_wrap!("BCrypt couldn't be used to verify password"))?
+        {
+            return trace_ok(Some(user.id));
+        }
+    }
+
+    trace_ok(None)
 }
