@@ -24,6 +24,7 @@ struct ReadHash {
     pub reply: oneshot::Sender<Result<String, io::Error>>,
 }
 
+#[derive(Clone)]
 pub struct FileManager {
     ch: mpsc::Sender<FileAction>,
 }

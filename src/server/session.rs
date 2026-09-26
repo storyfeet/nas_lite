@@ -1,8 +1,8 @@
 use crate::common_types as CT;
-use crate::db_util as DB;
 use crate::errors::trace_ok;
 use crate::models as MD;
 use crate::schema as SCH;
+use crate::server::db_util as DB;
 use anyhow::*;
 use chrono::Utc;
 use diesel::prelude::*;
@@ -35,7 +35,7 @@ pub async fn create_user_session(
         .await
         .map_err(any_wrap!("Could not access connection pool"))?;
 
-    let new_session = crate::session::new_session(user_id);
+    let new_session = new_session(user_id);
 
     diesel::insert_into(crate::schema::sessions::table)
         .values(&new_session)

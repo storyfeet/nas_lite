@@ -48,7 +48,6 @@ pub struct LoadedSession {
 #[diesel(table_name = crate::schema::files)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct File {
-    pub id: i64,
     pub file_type: CT::FileType,
     pub file_name: String,
     pub file_size: i64,

@@ -41,13 +41,13 @@ pub struct UploadState {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileUpload {
-    token: Token,
-    file_name: String,
-    file_hash: String,
-    file_size: u64,
-    chunk_size: u64,
-    chunk_num: u64,
-    data: Chunk,
+    pub token: Token,
+    pub file_name: String,
+    pub file_hash: String,
+    pub file_size: u64,
+    pub chunk_size: u64,
+    pub chunk_num: u64,
+    pub data: Chunk,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, AsExpression, FromSqlRow)]

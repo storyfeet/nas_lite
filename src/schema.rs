@@ -1,8 +1,7 @@
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
-    files (id) {
-        id -> BigInt,
+    files (file_hash,user_id,file_type) {
         user_id -> BigInt,
         file_name -> Text,
         file_type -> Text,

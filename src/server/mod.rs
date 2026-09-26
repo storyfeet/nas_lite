@@ -1,4 +1,9 @@
-use crate::db_util as DB;
+pub mod db_util;
+mod file_manager;
+mod session;
+use crate::common_types as CT;
+use crate::models as MD;
+use crate::schema as SCH;
 use anyhow::*;
 use axum::{
     Router,
@@ -6,13 +11,14 @@ use axum::{
     response,
     routing::{get, post},
 };
+use db_util as DB;
 use diesel::prelude::*;
 use diesel_async::{
     RunQueryDsl,
     pooled_connection::{AsyncDieselConnectionManager, bb8::Pool},
 };
+use file_manager::FileManager;
 
-use crate::common_types::*;
 use crate::errors::{ResponseResult, res_ok};
 
 use err_tools::{traceable::*, *};
@@ -73,11 +79,14 @@ pub fn run_server() -> Result<(), TraceError> {
             .await
             .expect("Could not build connection pool");
 
+        let file_man = FileManager::new().await;
+
         let app = Router::new()
             .route("/", get(hello))
             .route("/check/{name}/{pass}", get(check_pass))
             .route("/login", post(login))
-            .with_state(pool);
+            .with_state(pool)
+            .with_state(file_man);
 
         // run our app with hyper, listening globally on port 3000
         let listener = tokio::net::TcpListener::bind("localhost:3000")
@@ -91,13 +100,66 @@ pub fn run_server() -> Result<(), TraceError> {
 
 async fn login(
     State(mut cpool): State<DB::CPool>,
-    Json(user_pass): Json<UserPassword>,
-) -> ResponseResult<response::Json<SessionData>> {
-    let check = crate::session::check_user_pass(user_pass, &mut cpool)
+    Json(user_pass): Json<CT::UserPassword>,
+) -> ResponseResult<response::Json<CT::SessionData>> {
+    let check = session::check_user_pass(user_pass, &mut cpool)
         .await? //Result
         .ok_or::<TraceError>(err_at!("User Password not found"))?;
 
-    let sess = crate::session::create_user_session(check, &mut cpool).await?;
+    let sess = session::create_user_session(check, &mut cpool).await?;
 
     res_ok(response::Json(sess))
+}
+
+async fn upload_file(
+    State(mut cpool): State<DB::CPool>,
+    State(f_man): State<FileManager>,
+    Json(file_upload): Json<CT::FileUpload>,
+) -> ResponseResult<String> {
+    let sess_data = session::check_session(file_upload.token, &mut cpool)
+        .await?
+        .ok_or::<err_tools::traceable::TraceError>(err_at!("User does not exist"))?;
+
+    let mut con = cpool
+        .get()
+        .await
+        .map_err(any_wrap!("Could not access connection pool"))?;
+
+    use SCH::files::columns as FCOL;
+
+    let file_rec = SCH::files::dsl::files
+        .filter(FCOL::file_hash.eq(&file_upload.file_hash))
+        .filter(FCOL::user_id.eq(sess_data.id))
+        .filter(FCOL::file_type.eq(CT::FileType::File))
+        .select(MD::File::as_select())
+        .first(&mut con)
+        .await
+        .optional()
+        .map_err(any_wrap!("Could not get file by key",))?;
+
+    let (is_new_file, f_data): (bool, MD::File) = match file_rec {
+        Some(f) => (false, f),
+        None => (
+            true,
+            MD::File {
+                file_hash: file_upload.file_hash,
+                file_type: CT::FileType::File,
+                file_name: file_upload.file_name,
+                file_size: file_upload.file_size as i64,
+                chunk_size: file_upload.chunk_size as i64,
+                chunks_loaded: 0,
+                completed: None,
+                created: chrono::Utc::now().naive_utc(),
+                modified: chrono::Utc::now().naive_utc(),
+                deleted: None,
+            },
+        ),
+    };
+
+    if (file_upload.chunk_size != f_data.chunk_size as u64
+        || file_upload.chunk_num != f_data.chunks_loaded as u64
+        || file_upload.chunk_size != f_data.file_size as u64)
+    {}
+
+    res_ok("Trace".to_string())
 }
