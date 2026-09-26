@@ -8,6 +8,7 @@ mod hasher;
 mod models;
 mod schema;
 mod server;
+mod server_file_manager;
 mod session;
 
 use self::common_types::UserPassword;
