@@ -18,8 +18,9 @@ use diesel_async::{
     pooled_connection::{AsyncDieselConnectionManager, bb8::Pool},
 };
 use file_manager::FileManager;
+use std::path::PathBuf;
 
-use crate::errors::{ResponseResult, res_ok};
+use crate::errors::{ResponseResult, res_err, res_ok};
 
 use err_tools::{traceable::*, *};
 
@@ -79,7 +80,7 @@ pub fn run_server() -> Result<(), TraceError> {
             .await
             .expect("Could not build connection pool");
 
-        let file_man = FileManager::new().await;
+        let file_man = FileManager::new("ungit/server_side").await;
 
         let app = Router::new()
             .route("/", get(hello))
@@ -142,7 +143,7 @@ async fn upload_file(
         None => (
             true,
             MD::File {
-                file_hash: file_upload.file_hash,
+                file_hash: file_upload.file_hash.clone(),
                 file_type: CT::FileType::File,
                 file_name: file_upload.file_name,
                 file_size: file_upload.file_size as i64,
@@ -156,10 +157,36 @@ async fn upload_file(
         ),
     };
 
-    if (file_upload.chunk_size != f_data.chunk_size as u64
+    if file_upload.chunk_size != f_data.chunk_size as u64
         || file_upload.chunk_num != f_data.chunks_loaded as u64
-        || file_upload.chunk_size != f_data.file_size as u64)
-    {}
+        || file_upload.file_size != f_data.file_size as u64
+    {
+        return res_err(err_at!("Sent chunk does not match needed next chunk"));
+    }
+
+    let f_path: PathBuf = [&sess_data.user_name, "file", &file_upload.file_hash]
+        .iter()
+        .collect();
+
+    let offset = file_upload.chunk_size * file_upload.chunk_num;
+
+    let data_len = file_upload.data.0.len() as u64;
+
+    if data_len != file_upload.chunk_size && offset + data_len != file_upload.file_size {
+        return res_err(err_at!("sent data chunk incorrect size"));
+    }
+
+    let written = f_man
+        .write_chunk(file_upload.data.0, f_path, offset)
+        .await
+        .map_err(|e| {
+            let an: anyhow::Error = e.into();
+            err_wrap!("Could not write to file: ")(an)
+        })?;
+
+    if written as u64 != data_len {
+        return res_err(err_at!("Could not write whole chunk to file"));
+    }
 
     res_ok("Trace".to_string())
 }

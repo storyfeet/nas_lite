@@ -1,5 +1,5 @@
-use serde_json::de::Read;
-use std::io::{self, Write};
+use std::io;
+use std::path::{Path, PathBuf};
 use tokio::{
     io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
     sync::{mpsc, oneshot},
@@ -7,20 +7,20 @@ use tokio::{
 
 struct WriteChunk {
     pub data: Vec<u8>,
-    pub file_name: String,
+    pub file_name: PathBuf,
     pub offset: u64,
     pub reply: oneshot::Sender<Result<usize, io::Error>>,
 }
 
 struct ReadChunk {
-    pub file_name: String,
+    pub file_name: PathBuf,
     pub offset: u64,
     pub length: u64,
     pub reply: oneshot::Sender<Result<Vec<u8>, io::Error>>,
 }
 
 struct ReadHash {
-    pub file_name: String,
+    pub file_name: PathBuf,
     pub reply: oneshot::Sender<Result<String, io::Error>>,
 }
 
@@ -30,22 +30,24 @@ pub struct FileManager {
 }
 
 impl FileManager {
-    pub async fn new() -> Self {
+    pub async fn new<A: AsRef<Path>>(base_path: A) -> Self {
+        let base_buf = PathBuf::from(base_path.as_ref());
         let (t_send, mut t_rec) = mpsc::channel(32);
 
         tokio::spawn(async move {
             while let Some(f_action) = t_rec.recv().await {
                 match f_action {
                     FileAction::ReadChunk(rc) => {
-                        let res = read_chunk(&rc).await;
+                        let res = read_chunk(&rc, &base_buf).await;
                         _ = rc.reply.send(res);
                     }
                     FileAction::WriteChunk(wc) => {
-                        let res = write_chunk(&wc).await;
+                        let res = write_chunk(&wc, &base_buf).await;
                         _ = wc.reply.send(res);
                     }
                     FileAction::ReadHash(rh) => {
-                        let res = crate::hasher::hash_file_by_path(&rh.file_name).await;
+                        let full_path = base_buf.join(&rh.file_name);
+                        let res = crate::hasher::hash_file_by_path(&full_path).await;
                         _ = rh.reply.send(res);
                     }
                 }
@@ -58,7 +60,7 @@ impl FileManager {
     pub async fn write_chunk(
         &self,
         data: Vec<u8>,
-        file_name: String,
+        file_name: PathBuf,
         offset: u64,
     ) -> Result<usize, io::Error> {
         let (in_send, in_recv) = oneshot::channel();
@@ -77,7 +79,7 @@ impl FileManager {
 
     pub async fn read_chunk(
         &self,
-        file_name: String,
+        file_name: PathBuf,
         offset: u64,
         length: u64,
     ) -> Result<Vec<u8>, io::Error> {
@@ -95,7 +97,7 @@ impl FileManager {
         in_recv.await.expect("ONESHOT dropped inside WriteChunk")
     }
 
-    pub async fn read_hash(&self, file_name: String) -> Result<String, io::Error> {
+    pub async fn read_hash(&self, file_name: PathBuf) -> Result<String, io::Error> {
         let (in_send, in_recv) = oneshot::channel();
         self.ch
             .send(FileAction::ReadHash(ReadHash {
@@ -115,11 +117,13 @@ pub enum FileAction {
     ReadHash(ReadHash),
 }
 
-async fn write_chunk(wc: &WriteChunk) -> Result<usize, io::Error> {
+async fn write_chunk(wc: &WriteChunk, base_path: &Path) -> Result<usize, io::Error> {
+    let mut full_path = PathBuf::from(base_path);
+    full_path.push(&wc.file_name);
     let mut file = tokio::fs::File::options()
         .write(true)
         .create(true)
-        .open(&wc.file_name)
+        .open(&full_path)
         .await?;
 
     let _sk = file.seek(io::SeekFrom::Start(wc.offset)).await?;
@@ -127,10 +131,12 @@ async fn write_chunk(wc: &WriteChunk) -> Result<usize, io::Error> {
     file.write(&wc.data).await
 }
 
-async fn read_chunk(rc: &ReadChunk) -> Result<Vec<u8>, io::Error> {
+async fn read_chunk(rc: &ReadChunk, base_path: &Path) -> Result<Vec<u8>, io::Error> {
+    let mut full_path = PathBuf::from(base_path);
+    full_path.push(&rc.file_name);
     let mut file = tokio::fs::File::options()
         .read(true)
-        .open(&rc.file_name)
+        .open(&full_path)
         .await?;
 
     let _sk = file.seek(io::SeekFrom::Start(rc.offset)).await?;
@@ -154,15 +160,15 @@ pub mod test_file_manager {
             let a_len = data_a.len() as u64;
             let data_b = b" and everyone else".to_vec();
             let b_len = data_b.len() as u64;
-            let filename = "ungit/volatile/test_can_save_server.txt";
-            let f_man = FileManager::new().await;
+            let filename = "test_can_save_server.txt";
+            let f_man = FileManager::new(PathBuf::from("ungit/volatile")).await;
 
             let aw_a = f_man
-                .write_chunk(data_a, filename.to_string(), 0)
+                .write_chunk(data_a, PathBuf::from(filename), 0)
                 .await
                 .unwrap();
             let aw_b = f_man
-                .write_chunk(data_b, filename.to_string(), a_len)
+                .write_chunk(data_b, PathBuf::from(filename), a_len)
                 .await
                 .unwrap();
 

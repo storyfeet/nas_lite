@@ -85,7 +85,7 @@ impl FromSql<Text, Sqlite> for FileType {
 }
 
 #[derive(Debug, Clone)]
-pub struct Chunk(Vec<u8>);
+pub struct Chunk(pub Vec<u8>);
 
 impl Serialize for Chunk {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
