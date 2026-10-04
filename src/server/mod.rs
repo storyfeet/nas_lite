@@ -28,15 +28,21 @@ async fn hello() -> &'static str {
     "hello fools"
 }
 
+#[derive(Clone)]
+struct SState {
+    pool: DB::CPool,
+    f_man: FileManager,
+}
+
 async fn check_pass(
     Path((name, pass)): Path<(String, String)>,
-    State(cpool): State<DB::CPool>,
+    State(state): State<SState>,
 ) -> String {
     //Result<String, TraceError> {
     use crate::models::User;
     use crate::schema::users::dsl::*;
 
-    let mut con = cpool.get().await.unwrap();
+    let mut con = state.pool.get().await.unwrap();
     //.map_err(any_wrap!("Could not access connection pool"))?;
 
     let user_list = users
@@ -80,15 +86,17 @@ pub fn run_server() -> Result<(), TraceError> {
             .await
             .expect("Could not build connection pool");
 
-        let file_man = FileManager::new("ungit/server_side").await;
+        let f_man = FileManager::new("ungit/server_side").await;
+
+        let state = SState { pool, f_man };
 
         let app = Router::new()
             .route("/", get(hello))
+            .route("do_thing", post(do_thing))
             .route("/check/{name}/{pass}", get(check_pass))
-            // .route("/upload_file", post(upload_file))
+            .route("/upload_file", post(upload_file))
             .route("/login", post(login))
-            .with_state(pool)
-            .with_state(file_man);
+            .with_state(state);
 
         // run our app with hyper, listening globally on port 3000
         let listener = tokio::net::TcpListener::bind("localhost:3000")
@@ -101,28 +109,32 @@ pub fn run_server() -> Result<(), TraceError> {
 }
 
 async fn login(
-    State(mut cpool): State<DB::CPool>,
+    State(mut state): State<SState>,
     Json(user_pass): Json<CT::UserPassword>,
 ) -> ResponseResult<response::Json<CT::SessionData>> {
-    let check = session::check_user_pass(user_pass, &mut cpool)
+    let check = session::check_user_pass(user_pass, &mut state.pool)
         .await? //Result
         .ok_or::<TraceError>(err_at!("User Password not found"))?;
 
-    let sess = session::create_user_session(check, &mut cpool).await?;
+    let sess = session::create_user_session(check, &mut state.pool).await?;
 
     res_ok(response::Json(sess))
 }
 
+async fn do_thing(State(state): State<SState>) -> String {
+    "do_thing".to_string()
+}
+
 async fn upload_file(
-    State(mut cpool): State<DB::CPool>,
-    State(f_man): State<FileManager>,
+    State(mut state): State<SState>,
     Json(file_upload): Json<CT::FileUpload>,
 ) -> ResponseResult<String> {
-    let sess_data = session::check_session(file_upload.token, &mut cpool)
+    let sess_data = session::check_session(file_upload.token, &mut state.pool)
         .await?
         .ok_or::<err_tools::traceable::TraceError>(err_at!("User does not exist"))?;
 
-    let mut con = cpool
+    let mut con = state
+        .pool
         .get()
         .await
         .map_err(any_wrap!("Could not access connection pool"))?;
@@ -181,7 +193,8 @@ async fn upload_file(
         return res_err(err_at!("sent data chunk incorrect size"));
     }
 
-    let written = f_man
+    let written = state
+        .f_man
         .write_chunk(file_upload.data.0, f_path.clone(), offset)
         .await
         .map_err(|e| {
@@ -197,7 +210,7 @@ async fn upload_file(
 
     if f_data.chunks_loaded as i64 * f_data.chunk_size as i64 >= f_data.file_size {
         // check hash matches, if so mark complete
-        let hash = f_man.read_hash(f_path).await.map_err(|e| {
+        let hash = state.f_man.read_hash(f_path).await.map_err(|e| {
             let an: anyhow::Error = e.into();
             err_wrap!("Could not read file for hash")(an)
         })?;
