@@ -111,7 +111,7 @@ impl FileManager {
     }
 }
 
-pub enum FileAction {
+enum FileAction {
     WriteChunk(WriteChunk),
     ReadChunk(ReadChunk),
     ReadHash(ReadHash),

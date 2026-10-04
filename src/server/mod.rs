@@ -85,6 +85,7 @@ pub fn run_server() -> Result<(), TraceError> {
         let app = Router::new()
             .route("/", get(hello))
             .route("/check/{name}/{pass}", get(check_pass))
+            // .route("/upload_file", post(upload_file))
             .route("/login", post(login))
             .with_state(pool)
             .with_state(file_man);
@@ -130,7 +131,7 @@ async fn upload_file(
 
     let file_rec = SCH::files::dsl::files
         .filter(FCOL::file_hash.eq(&file_upload.file_hash))
-        .filter(FCOL::user_id.eq(sess_data.id))
+        .filter(FCOL::user_id.eq(sess_data.user_id))
         .filter(FCOL::file_type.eq(CT::FileType::File))
         .select(MD::File::as_select())
         .first(&mut con)
@@ -138,7 +139,7 @@ async fn upload_file(
         .optional()
         .map_err(any_wrap!("Could not get file by key",))?;
 
-    let (is_new_file, f_data): (bool, MD::File) = match file_rec {
+    let (is_new_file, mut f_data): (bool, MD::File) = match file_rec {
         Some(f) => (false, f),
         None => (
             true,
@@ -164,9 +165,13 @@ async fn upload_file(
         return res_err(err_at!("Sent chunk does not match needed next chunk"));
     }
 
-    let f_path: PathBuf = [&sess_data.user_name, "file", &file_upload.file_hash]
-        .iter()
-        .collect();
+    let f_path: PathBuf = [
+        &(sess_data.user_id.to_string()),
+        "file",
+        &file_upload.file_hash,
+    ]
+    .iter()
+    .collect();
 
     let offset = file_upload.chunk_size * file_upload.chunk_num;
 
@@ -177,7 +182,7 @@ async fn upload_file(
     }
 
     let written = f_man
-        .write_chunk(file_upload.data.0, f_path, offset)
+        .write_chunk(file_upload.data.0, f_path.clone(), offset)
         .await
         .map_err(|e| {
             let an: anyhow::Error = e.into();
@@ -187,6 +192,35 @@ async fn upload_file(
     if written as u64 != data_len {
         return res_err(err_at!("Could not write whole chunk to file"));
     }
+
+    f_data.chunks_loaded += 1;
+
+    if f_data.chunks_loaded as i64 * f_data.chunk_size as i64 >= f_data.file_size {
+        // check hash matches, if so mark complete
+        let hash = f_man.read_hash(f_path).await.map_err(|e| {
+            let an: anyhow::Error = e.into();
+            err_wrap!("Could not read file for hash")(an)
+        })?;
+
+        if hash != file_upload.file_hash {
+            // TODO work out how to reset file upload - probably set chunk to zero and delete
+            return res_err(err_at!("Hash did not match"));
+        }
+        f_data.completed = Some(chrono::Utc::now().naive_utc());
+    }
+
+    use SCH::files::dsl as FSL;
+    let _ = diesel::insert_into(SCH::files::table)
+        .values(&f_data)
+        .on_conflict((FSL::file_hash, FSL::user_id, FSL::file_type))
+        .do_update()
+        .set(&f_data)
+        .execute(&mut con)
+        .await
+        .map_err(|e| {
+            let an: anyhow::Error = e.into();
+            err_wrap!("Could not read file for hash")(an)
+        })?;
 
     res_ok("Trace".to_string())
 }

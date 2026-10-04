@@ -38,13 +38,12 @@ pub struct NewSession {
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct LoadedSession {
     pub expires: NaiveDateTime,
-    #[diesel(select_expression = SCH::users::id)]
-    pub id: i64,
+    pub user_id: i64,
     #[diesel(select_expression = SCH::users::user_name)]
     pub user_name: String,
 }
 
-#[derive(Queryable, Selectable, Insertable, Serialize, Deserialize)]
+#[derive(Queryable, Selectable, Insertable, Serialize, Deserialize, AsChangeset)]
 #[diesel(table_name = crate::schema::files)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct File {
