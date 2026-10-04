@@ -1,0 +1,2 @@
+err:
+	cargo rustc -- -Awarnings
